@@ -103,7 +103,7 @@
                                 @Html.Raw(Model.ShortDescription)
                             </div>
                         }
-                        @if (Model.ProductPrice.RefundablePrice != "")
+                        @if (!string.IsNullOrWhiteSpace(Model.ProductPrice?.RefundablePrice))
                         {
                             <div class="short-description">
                                 <label>@T("Refundable.Price"): <span class="refundable-price"> @Model.ProductPrice.RefundablePrice</span></label>
