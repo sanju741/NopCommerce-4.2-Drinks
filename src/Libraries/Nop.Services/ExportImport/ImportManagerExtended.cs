@@ -262,6 +262,8 @@ namespace Nop.Services.ExportImport
                     product.OrderMaximumQuantity = int.MaxValue - 1;
                     product.ManageInventoryMethod = ManageInventoryMethod.ManageStock;
                     product.BackorderMode = BackorderMode.NoBackorders;
+                    //disable shipping by default
+                    product.IsShipEnabled = false;
 
                     //tax
                     var taxProperty = metadata.Manager.GetProperty("Percent VAT");

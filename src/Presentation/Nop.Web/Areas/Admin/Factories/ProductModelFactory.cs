@@ -327,22 +327,22 @@ namespace Nop.Web.Areas.Admin.Factories
                             case AttributeControlType.Checkboxes:
                             case AttributeControlType.ColorSquares:
                             case AttributeControlType.ImageSquares:
-                            {
-                                if (!string.IsNullOrEmpty(productAttributeMapping.ConditionAttributeXml))
                                 {
-                                    //clear default selection
-                                    foreach (var item in attributeModel.Values)
-                                        item.IsPreSelected = false;
-
-                                    //select new values
-                                    var selectedValues = _productAttributeParser.ParseProductAttributeValues(productAttributeMapping.ConditionAttributeXml);
-                                    foreach (var attributeValue in selectedValues)
+                                    if (!string.IsNullOrEmpty(productAttributeMapping.ConditionAttributeXml))
+                                    {
+                                        //clear default selection
                                         foreach (var item in attributeModel.Values)
-                                            if (attributeValue.Id == item.Id)
-                                                item.IsPreSelected = true;
+                                            item.IsPreSelected = false;
+
+                                        //select new values
+                                        var selectedValues = _productAttributeParser.ParseProductAttributeValues(productAttributeMapping.ConditionAttributeXml);
+                                        foreach (var attributeValue in selectedValues)
+                                            foreach (var item in attributeModel.Values)
+                                                if (attributeValue.Id == item.Id)
+                                                    item.IsPreSelected = true;
+                                    }
                                 }
-                            }
-                            break;
+                                break;
                             case AttributeControlType.ReadonlyCheckboxes:
                             case AttributeControlType.TextBox:
                             case AttributeControlType.MultilineTextbox:
@@ -813,6 +813,9 @@ namespace Nop.Web.Areas.Admin.Factories
                 model.AllowCustomerReviews = true;
                 model.Published = true;
                 model.VisibleIndividually = true;
+                // todo override this method?
+                //extended: shipping is disabled by default
+                model.IsShipEnabled = false;
             }
 
             model.PrimaryStoreCurrencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode;
