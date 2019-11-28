@@ -105,6 +105,27 @@ namespace Nop.Services.ExportImport
         {
             _customerService = customerService;
         }
+
+        protected Category CreateCategoryAndSlug(string categoryName, int parentId = 0)
+        {
+            var category = new Category
+            {
+                Name = categoryName,
+                ParentCategoryId = parentId,
+                Published = true,
+                DisplayOrder = 0,
+                IncludeInTopMenu = true,
+                AllowCustomersToSelectPageSize = true,
+                PageSizeOptions = "6,3,9"
+            };
+            //save category and its slug
+            _categoryService.InsertCategory(category);
+
+            string categorySeName = _urlRecordService.ValidateSeName(category, "", category.Name, true);
+            _urlRecordService.SaveSlug(category, categorySeName, 0);
+            return category;
+        }
+
         /// <summary>
         /// Import products from XLSX file
         /// </summary>
@@ -128,18 +149,8 @@ namespace Nop.Services.ExportImport
                 }
 
                 //performance optimization, load all categories in one SQL request
-                Dictionary<string, Category> allCategories;
-                try
-                {
-                    IList<Category> allCategoryList = _categoryService.GetAllCategories(showHidden: true, loadCacheableCopy: false);
-                    allCategories = allCategoryList
-                        .ToDictionary(c => c.Name, c => c);
-                }
-                catch (ArgumentException)
-                {
-                    //categories with the same name are not supported in the same category level
-                    throw new ArgumentException(_localizationService.GetResource("Admin.Catalog.Products.Import.CategoriesWithSameNameNotSupported"));
-                }
+                IList<Category> allCategoryList = _categoryService.GetAllCategories(showHidden: true, loadCacheableCopy: false);
+
 
                 //performance optimization, load all manufacturers in one SQL request
                 var allManufacturers = _manufacturerService.GetAllManufacturers(showHidden: true);
@@ -301,36 +312,80 @@ namespace Nop.Services.ExportImport
                     if (tempProperty != null && !string.IsNullOrWhiteSpace(tempProperty.StringValue))
                     {
                         var categoryName = tempProperty.StringValue.Trim();
+                        int parentCategoryId = 0;
 
-                        int rez = allCategories.ContainsKey(categoryName) ?
-                                         allCategories[categoryName].Id :
-                                         0;
+                        //great grand parent category
+                        tempProperty = metadata.Manager.GetProperty("Group");
+                        var greatGrandParentName = tempProperty.StringValue.Trim();
+                        var greatGrandParent = allCategoryList
+                            .FirstOrDefault(x =>
+                                x.Name.Equals(greatGrandParentName) && x.ParentCategoryId == parentCategoryId);
+                        if (greatGrandParent == null)
+                        {
+                            var category = CreateCategoryAndSlug(greatGrandParentName, parentCategoryId);
+
+                            //Update existing list and parent category id
+                            allCategoryList.Add(category);
+                            parentCategoryId = category.Id;
+                        }
+                        else
+                        {
+                            parentCategoryId = greatGrandParent.Id;
+                        }
+
+                        //grand parent category
+                        tempProperty = metadata.Manager.GetProperty("SegmentID");
+                        var grandParentName = tempProperty.StringValue.Trim();
+                        var grandParent = allCategoryList.FirstOrDefault(x =>
+                            x.Name.Equals(grandParentName) && x.ParentCategoryId == parentCategoryId);
+                        if (grandParent == null)
+                        {
+                            var category = CreateCategoryAndSlug(grandParentName, parentCategoryId);
+
+                            // Update existing list and parent category id
+                            allCategoryList.Add(category);
+                            parentCategoryId = category.Id;
+                        }
+                        else
+                        {
+                            parentCategoryId = grandParent.Id;
+                        }
+
+                        //parent category
+                        tempProperty = metadata.Manager.GetProperty("SubSegment");
+                        var parentName = tempProperty.StringValue.Trim();
+                        var parent = allCategoryList.FirstOrDefault(x =>
+                                         x.Name.Equals(parentName) && x.ParentCategoryId == parentCategoryId);
+                        if (parent == null && !string.IsNullOrWhiteSpace(parentName))
+                        {
+                            var category = CreateCategoryAndSlug(parentName, parentCategoryId);
+
+                            // Update existing list and parent category id
+                            allCategoryList.Add(category);
+                            parentCategoryId = category.Id;
+                        }
+                        else if (parent != null)
+                        {
+                            parentCategoryId = parent.Id;
+                        }
+
+
+                        int? rez = allCategoryList.FirstOrDefault(x => x.Name.Equals(categoryName) && x.ParentCategoryId == parentCategoryId)?.Id;
 
                         //categories does not exist. Insert new category
-                        if (rez == 0)
+                        if (rez == null)
                         {
-                            var category = new Category
-                            {
-                                Name = categoryName,
-                                Published = true,
-                                DisplayOrder = 0,
-                                AllowCustomersToSelectPageSize = true,
-                                PageSizeOptions = "6,3,9"
-                            };
-                            //save category and its slug
-                            _categoryService.InsertCategory(category);
-                            string categorySeName = _urlRecordService.ValidateSeName(category, "", category.Name, true);
-                            _urlRecordService.SaveSlug(category, categorySeName, 0);
+                            var category = CreateCategoryAndSlug(categoryName, parentCategoryId);
 
                             rez = category.Id;
-                            allCategories.Add(categoryName, category);
+                            allCategoryList.Add(category);
                         }
 
                         //insert product category mapping
                         var productCategory = new ProductCategory
                         {
                             ProductId = product.Id,
-                            CategoryId = rez,
+                            CategoryId = rez.Value,
                             IsFeaturedProduct = false,
                             DisplayOrder = 1
                         };
