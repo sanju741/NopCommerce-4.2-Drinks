@@ -446,6 +446,18 @@ namespace Nop.Services.Common
                 totalsTable.AddCell(p);
             }
 
+            // refundable price
+            var orderRefundablePriceInCustomerCurrency =
+                _currencyService.ConvertCurrency(order.RefundablePrice, order.CurrencyRate);
+            var orderRefundableTaxStr = _priceFormatter.FormatPrice(orderRefundablePriceInCustomerCurrency, true,
+                order.CustomerCurrencyCode, lang, true);
+
+            var pa = GetPdfCell($"{_localizationService.GetResource("PDFInvoice.RefundablePrice", lang.Id)} {orderRefundableTaxStr}", font);
+            pa.HorizontalAlignment = Element.ALIGN_RIGHT;
+            pa.Border = Rectangle.NO_BORDER;
+            totalsTable.AddCell(pa);
+
+
             //discount (applied to order subtotal)
             if (order.OrderSubTotalDiscountExclTax > decimal.Zero)
             {
